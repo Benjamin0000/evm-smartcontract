@@ -28,13 +28,13 @@ contract CnoteMintPass is  ERC721URIStorage{
         _;
     }
     
-    function mintNFT(uint8 amt) public payable returns (uint256){
+    function mintNFT(uint256 amt) public payable returns (uint256){
         uint256 newid = _tokenIds.current();
         require(amt > 0 && amt <= maxMint, "too much minting");
         require( newid <= MAX && (newid + amt) <= MAX, "max mint cap reached");
         require(msg.value == price * amt, "Under priced");
 
-        for(uint8 i = 1; i <= amt; i++){
+        for(uint256 i = 1; i <= amt; i++){
             newid = _tokenIds.current();
             _mint(msg.sender, newid);
             _setTokenURI(newid, _tokenURL);
