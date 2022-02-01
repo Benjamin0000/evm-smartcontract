@@ -15,7 +15,7 @@ contract CnoteMintPass is  ERC721URIStorage{
     }
 
     uint256 public MAX = 9999;
-    uint256 public price = 0.4 ether;
+    uint256 public price = 0.001 ether;
     uint256 public maxMint = 5;
     uint256 public totalSupply;
 
@@ -27,12 +27,13 @@ contract CnoteMintPass is  ERC721URIStorage{
         require(msg.sender == owner);
         _;
     }
-    
+
     function mintNFT(uint256 amt) public payable returns (uint256){
         uint256 newid = _tokenIds.current();
         require(amt > 0 && amt <= maxMint, "too much minting");
-        require( newid <= MAX && (newid + amt) <= MAX, "max mint cap reached");
-        require(msg.value == price * amt, "Under priced");
+        uint256 totalID = (newid + amt) - 1;
+        require( totalID <= MAX, "max mint cap reached");
+        require( msg.value == price * amt, "Under priced");
 
         for(uint256 i = 1; i <= amt; i++){
             newid = _tokenIds.current();
@@ -69,4 +70,5 @@ contract CnoteMintPass is  ERC721URIStorage{
     function contractURI() public view returns (string memory){
         return _contractURL;
     }
+
 }
