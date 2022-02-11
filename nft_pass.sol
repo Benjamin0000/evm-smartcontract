@@ -10,8 +10,8 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
     constructor() ERC721("Cnote mint pass", "CNOTE MINT PASS") {
         //_owner = address(0x1Fd793c451653C26c94185bC5d5b43a2E4a2e797);
         _owner = msg.sender;
-       // _tokenURLS = "https://gateway.pinata.cloud/ipfs/QmcwBHmr6XU5QcBYL35UsEPnSQBJmzz28erxvMmmmmmy6J";
-        _contractURL = "https://gateway.pinata.cloud/ipfs/QmcKGQTYRQNMZA5LYaJtiP7u6dMZfpEERXWdRmYeqpzpxZ";
+        _contractURL = "ipfs://QmSkqGidC3PNJkHyvpQuGrBX4bgRLw6LRSWrdMVnseWC8V";
+        dontShowURL = true;
     }
 
     uint256 public MAX = 9999;
@@ -21,11 +21,11 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
     uint16  public lastMeta = 0;
 
     string[] _tokenURLS = [  //set the five metadata here.
-        "first",
-        "second",
-        "third",
-        "forth",
-        "fifth"
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/1.json",
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/2.json",
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/3.json",
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/4.json",
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/5.json"
     ];
 
     mapping(uint256 => string) private _tokenURIs;
@@ -36,7 +36,7 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
     bool public stopWhiteList;
     bool private dontShowURL;
     string private _contractURL;
-    string private hiddenURL = ""; // set the hidden url here
+    string private hiddenURL = "ipfs://QmSuP5zeBqM15p8dyPt5NiUNxPVSU4zxB5W4JiQHXa2yZ9/hidden.json"; // set the hidden url here
     address private _owner;
 
 
