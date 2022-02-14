@@ -88,7 +88,7 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         items[ItemData.total].standard = standard;
         items[ItemData.total].startTime = block.timestamp + (startTime  * 3600);
         items[ItemData.total].startPrice = startPrice;
-        ItemData.total+1;
+        ItemData.total+=1;
         emit NewItem(
             ItemData.total - 1, _id, name, description, url, _address, standard, startTime, startPrice
         );

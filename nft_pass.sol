@@ -1,74 +1,98 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.0; 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Counters.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
-contract CnoteMintPass is  ERC721URIStorage, Ownable {
+contract CnoteMintPass is  ERC721URIStorage, Ownable { 
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
     constructor() ERC721("Cnote mint pass", "CNOTE MINT PASS") {
         //_owner = address(0x1Fd793c451653C26c94185bC5d5b43a2E4a2e797);
-        _owner = msg.sender;
+        _owner = msg.sender; 
         _contractURL = "ipfs://QmSkqGidC3PNJkHyvpQuGrBX4bgRLw6LRSWrdMVnseWC8V";
         dontShowURL = true;
+        rarity[0] = 250;
+        rarity[1] = 2500;
+        rarity[2] = 50;
+        rarity[3] = 1450;
+        rarity[4] = 750;
+        rarity[5] = 5000;
     }
 
     uint256 public MAX = 9999;
     uint256 public price = 0.001 ether;
     uint256 public maxMint = 5;
-    uint256 public totalSupply;
+    uint256 public totalSupply; 
     uint16  public lastMeta = 0;
 
-    string[] _tokenURLS = [  //set the five metadata here.
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/1.json",
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/2.json",
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/3.json",
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/4.json",
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/5.json"
-    ];
-
-    mapping(uint256 => string) private _tokenURIs;
+    mapping(uint256 =>string) private _tokenURIs;
     mapping(uint16=>uint) public metaTracker;
+    mapping(uint16=>uint) public rarity;
     mapping(address=>bool) public whiteListed;
-
-
+ 
     bool public stopWhiteList;
     bool private dontShowURL;
     string private _contractURL;
     string private hiddenURL = "ipfs://QmSuP5zeBqM15p8dyPt5NiUNxPVSU4zxB5W4JiQHXa2yZ9/hidden.json"; // set the hidden url here
     address private _owner;
 
+    string[] _tokenURLS = [  //set the five metadata here.
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/1.json", //black
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/2.json", //blue
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/3.json", //gold
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/4.json", //green
+        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/5.json",  //pink
+        "ipfs://QmcFfWsiLFjmWY2aDjEQnxxoYUUY6tt6a45x7FysWtN162" //purple
+    ];
 
+     
     function mintNFT(uint256 amt) public payable returns (uint256){
-        require(balanceOf(msg.sender) < maxMint, "You can no longer mint");
-        uint256 newid = _tokenIds.current();
+        uint balance = balanceOf(msg.sender); 
         require(amt > 0 && amt <= maxMint, "too much minting");
+        require(balance + amt <= maxMint, "too much minting");
+        uint256 newid = _tokenIds.current(); 
         uint256 totalID = (newid + amt) - 1;
         require( totalID <= MAX, "max mint cap reached");
-        require( msg.value == price * amt, "Under priced");
-        if(!stopWhiteList)
+        require( msg.value >= price * amt, "Under priced");
+        if(!stopWhiteList && msg.sender != owner() )
             require(whiteListed[msg.sender], "You've not been whitelisted");
 
         for(uint256 i = 1; i <= amt; i++){
             newid = _tokenIds.current();
             _mint(msg.sender, newid);
-            _setTokenURI(newid, _tokenURLS[lastMeta]);
+            _setTokenURI(newid, _tokenURLS[lastMeta]); 
             _tokenIds.increment();
             metaTracker[lastMeta]++;
-            if(lastMeta < 4){
-                // if(lastMeta == 0 && metaTracker[lastMeta] >= 10)
-                     lastMeta++;
-                // if(lastMeta == 1 && metaTracker[lastMeta] >= 10){
-                //     lastMeta++;
-                // }
-            }else{
-                lastMeta = 0;
-            }
+            lastMeta = getMintable(lastMeta); 
         }
         totalSupply = _tokenIds.current();
-        payable(_owner).transfer(msg.value);
+        payable(_owner).transfer(msg.value); 
         return newid;
+    }
+
+    function getMintable(uint16 _id) internal view returns(uint16){
+        uint16 _lastMeta;
+        if( _id < 5 ){
+            for(uint16 i = 1; i <= 5; i++){
+                if( metaTracker[_id + i] < rarity[_id + i] ){
+                    _lastMeta = _id + i;
+                    break;
+                } 
+            }
+        }else{
+            if( metaTracker[0] < rarity[0] ){
+                _lastMeta = 0;
+            }else{
+                for(uint16 i = 1; i <= 5; i++){
+                    if( metaTracker[i] < rarity[i] ){
+                        _lastMeta = i;
+                        break;
+                    } 
+                }
+            }
+        }
+        return _lastMeta;
     }
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
@@ -84,7 +108,6 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
         return _owner;
     }
 
-
     function burn(uint256 tokenID) public {
         _burn(tokenID);
         if(totalSupply > 0){
@@ -94,8 +117,8 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
         }
     }
 
-    function updateData(uint256 _MAX, uint256 _price, uint256 _maxMint) public onlyOwner {
-        MAX = _MAX; price = _price; maxMint = _maxMint;
+    function updateData(uint256 _price, uint256 _maxMint) public onlyOwner {
+         price = _price; maxMint = _maxMint;
     }
 
     function updateTokenUrl(string[] memory _url) public onlyOwner {
@@ -118,15 +141,15 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
 
     function hideURL(bool status) public onlyOwner {
         dontShowURL = status;
-    }
+    } 
 
     function addToWhiteList(address[] memory _users, uint8 _type) public onlyOwner {
-        if(_type == 1){
-            for(uint i = 0; i < _users.length; i++)
+        for( uint i = 0; i < _users.length; i++ ){
+            if(_type == 1){
                 whiteListed[_users[i]] = true;
-        }else{
-            for(uint i = 0; i < _users.length; i++)
+            }else{
                 whiteListed[_users[i]] = false;
+            }
         }
     }
 
