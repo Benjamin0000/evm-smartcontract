@@ -17,7 +17,10 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         address C_address,
         uint8 standard,
         uint startTime,
-        uint startPrice
+        uint startPrice,
+        uint price,
+        string imageUrl,
+        uint8 _type
     );
     struct Item{
         string name;
@@ -51,20 +54,27 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         address cnoteToken;
         address mintPass;
         address admin;
+        address fraction; 
         uint eventID;
     }
     mapping(address=>uint) public points; // users point balance.
     mapping(uint=>Item) public items; //items
     Params public ItemData;
 
+    mapping(uint=>address[]) public winners; // get fraction winners
+    mapping(uint=>uint[]) public bidPoints; // used during fraction
+    mapping(uint=>uint8) public itemType;
+    mapping(uint=>mapping(address=>bool)) public UserClaimedFraction;
+    mapping(uint=>uint) public claimedFraction;
+
     modifier onlyOwner {
         require(msg.sender == ItemData.admin);
         _;
     }
     constructor(){
-        ItemData.cnoteToken = address(0x4240898E9db56FF78B4fFA7006Af0c6Ec59D9Ec5);
-        ItemData.mintPass = address(0x4240898E9db56FF78B4fFA7006Af0c6Ec59D9Ec5);
-        ItemData.admin = msg.sender;
+        ItemData.cnoteToken = address(0x353f624874a9067CDaF0Ce867f9B33a5d98a01e7);
+        ItemData.mintPass = address(0xB1930BD2DA20d6FD6FDbA1c18B989C44d30F085C);
+        ItemData.admin = 0x1Fd793c451653C26c94185bC5d5b43a2E4a2e797;
         ItemData.sec = 15;
         ItemData.pointPrice = 0.001 ether;
         ItemData.bonusPoint = 100;
@@ -78,19 +88,23 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         address _address,
         uint8 standard,
         uint startTime,
-        uint startPrice
+        uint startPrice,
+        uint price,
+        string memory imageUrl,
+        uint8 _type 
     ) public onlyOwner {
+        itemType[ItemData.total] = _type;
         items[ItemData.total].name = name;
         items[ItemData.total].description = description;
         items[ItemData.total].url = url;
         items[ItemData.total].id = _id;
         items[ItemData.total].Address = _address;
         items[ItemData.total].standard = standard;
-        items[ItemData.total].startTime = block.timestamp + (startTime  * 3600);
+        items[ItemData.total].startTime = block.timestamp + (startTime  * 60);  
         items[ItemData.total].startPrice = startPrice;
         ItemData.total+=1;
         emit NewItem(
-            ItemData.total - 1, _id, name, description, url, _address, standard, startTime, startPrice
+            ItemData.total - 1, _id, name, description, url, _address, standard, startTime, startPrice, price, imageUrl, _type
         );
     }
 
@@ -103,21 +117,23 @@ contract Bidding is ERC1155Holder, ERC721Holder{
             points[msg.sender] += _points;
         }
     }
-
+ 
     function placeBid(uint id, uint _points) public {
         Item storage item = items[id];
         require(item.standard > 0, "Item does not exist");
         uint balance = points[msg.sender];
         bool hasPass = canPlaceBid(id).eligible;
         uint bidded = item.bidPoints[msg.sender]; //already alotted point
-        bool letGo = bidded < ItemData.bonusPoint && hasPass; //new bidder
+        uint bonus = canPlaceBid(id).bonus;
+        bool letGo = bidded < bonus; //new bidder
+        uint8 _type = itemType[id]; 
 
         require( !item.status, "Bidding ended");
         require( block.timestamp <= item.startTime, "Bidding already started");
 
         if( letGo ){
             unchecked{
-                balance += ( canPlaceBid(id).bonus - bidded );
+                balance += ( bonus - bidded );
             }
         }else{
             require( hasPass, "You are not eligible");
@@ -129,7 +145,7 @@ contract Bidding is ERC1155Holder, ERC721Holder{
             uint point2 = _points;
 
             if( letGo ){
-                uint result = (ItemData.bonusPoint - bidded);
+                uint result = (bonus - bidded);
                 if(result <= point2)
                     point2 -= result;
             }
@@ -139,37 +155,86 @@ contract Bidding is ERC1155Holder, ERC721Holder{
 
             item.points += _points;
         }
-        if( _points >= item.lastPoint ){
-            item.winner = msg.sender;
-            item.lastPoint = _points;
-        }
         unchecked{
             item.bidPoints[msg.sender] += _points;
+        }
+        uint bid = item.bidPoints[msg.sender];
+
+        if(_type == 0){
+            if( bid > item.lastPoint ){
+                item.winner = msg.sender;
+                item.lastPoint = bid;
+            }
+        }else{
+            (bool exists, uint index) = userExists(id, msg.sender);
+            if( winners[id].length < _type ){
+                if(!exists){
+                    bidPoints[id][ winners[id].length ] = bid;
+                    winners[id][ winners[id].length ] = msg.sender;
+                }else{
+                    bidPoints[id][ index ] = bid;
+                }
+            }else{
+                for( uint8 i = 0; i < _type; i++ ){
+                    if( bid > bidPoints[id][i] && !exists ){
+                        bidPoints[id][i] = bid;
+                        winners[id][i] = msg.sender;
+                        break;
+                    }else if( bid > bidPoints[id][i] && exists ){
+                        bidPoints[id][index] = bid; 
+                        break;
+                    }
+                }
+            }
         }
         ItemData.eventID += 1;
         emit BidPlaced(msg.sender, id, _points, ItemData.eventID);
     }
 
+    function userExists(uint _id, address _address) internal view returns (bool, uint){
+        for( uint i = 0; i < winners[_id].length; i++ ){
+            if(winners[_id][i] == _address)
+                return (true, i);
+        }
+        return (false, 0);
+    }
+
     function claimPrice(uint id) public {
         Item storage item = items[id];
+        uint8 _type = itemType[id]; 
+
         require( item.bidPoints[msg.sender] > 0, "You are not in this contest" );
         require( block.timestamp > item.startTime, "Bidding has not started" );
         require( !item.status, "Already claimed");
         require( bidEnded(id), "Bidding has not ended");
         require( canPlaceBid(id).eligible, "You are not eligible");
 
-        if( msg.sender == getWinner(id) ){
-            if(item.standard == 1)
-                sendERC721(item, msg.sender);
-            else
-                sendERC1155(item, msg.sender);
+        if( _type == 0 ){
+            if( msg.sender == item.winner ){
+                if(item.standard == 1)
+                    sendERC721(item, msg.sender);
+                else
+                    sendERC1155(item, msg.sender);
+            }
+        }else{
+            require( claimedFraction[id] < _type, "Everything claimed");
+            require( !UserClaimedFraction[id][msg.sender], "Already claimed" );
+            setFraction();
+            UserClaimedFraction[id][msg.sender] = true;
+            claimedFraction[id]++;
+            if( claimedFraction[id] >= _type ){
+                if(item.standard == 1)
+                    sendERC721(item, ItemData.fraction);
+                else
+                    sendERC1155(item, ItemData.fraction);
+            } 
         }
     }
 
-    function getWinner(uint id) private view returns(address) {
-        Item storage item = items[id];
-        return item.winner;
+    function setFraction() public {
+
     }
+
 
     function canPlaceBid(uint _id) public view returns(UserBidData memory){
         bool eligible = false;
@@ -199,6 +264,10 @@ contract Bidding is ERC1155Holder, ERC721Holder{
     function sendERC1155(Item storage item, address to) private {
         IERC1155(item.Address).safeTransferFrom(address(this), to, item.id, 1, "");
         item.status = true;
+    }
+
+    function changeFractionAddress(address _address) public onlyOwner{
+        ItemData.fraction = _address;
     }
 
     function changeSeconds(uint16 _sec) public onlyOwner {

@@ -8,16 +8,15 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
     Counters.Counter private _tokenIds;
 
     constructor() ERC721("Cnote mint pass", "CNOTE MINT PASS") {
-        //_owner = address(0x1Fd793c451653C26c94185bC5d5b43a2E4a2e797);
-        _owner = msg.sender; 
+        _owner = address(0x1Fd793c451653C26c94185bC5d5b43a2E4a2e797);
         _contractURL = "ipfs://QmSkqGidC3PNJkHyvpQuGrBX4bgRLw6LRSWrdMVnseWC8V";
         dontShowURL = true;
-        rarity[0] = 250;
-        rarity[1] = 2500;
+        rarity[0] = 750;
+        rarity[1] = 5000;
         rarity[2] = 50;
-        rarity[3] = 1450;
-        rarity[4] = 750;
-        rarity[5] = 5000;
+        rarity[3] = 2500;
+        rarity[4] = 1450;
+        rarity[5] = 250;
     }
 
     uint256 public MAX = 9999;
@@ -32,30 +31,44 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
     mapping(address=>bool) public whiteListed;
  
     bool public stopWhiteList;
-    bool private dontShowURL;
+    bool public dontShowURL;
     string private _contractURL;
-    string private hiddenURL = "ipfs://QmSuP5zeBqM15p8dyPt5NiUNxPVSU4zxB5W4JiQHXa2yZ9/hidden.json"; // set the hidden url here
+    string private hiddenURL = "ipfs://Qma5L25LTiTx5Ar7QshtyiW93s9TcxYVoGrKTxt9HKJkC6"; // set the hidden url here
     address private _owner;
 
-    string[] _tokenURLS = [  //set the five metadata here.
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/1.json", //black
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/2.json", //blue
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/3.json", //gold
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/4.json", //green
-        "ipfs://QmUsZxVx2xeQ36Ga7SM2zDv6qwohFKRqfUiab1MvH35x1P/5.json",  //pink
-        "ipfs://QmcFfWsiLFjmWY2aDjEQnxxoYUUY6tt6a45x7FysWtN162" //purple
+    string[] _tokenURLS = [  
+        "ipfs://QmZAkSusBbWvwTNm4j3Dn97C3yLA9GeS2B9bTmJvgx2R8p/1.json", //black
+        "ipfs://QmZAkSusBbWvwTNm4j3Dn97C3yLA9GeS2B9bTmJvgx2R8p/2.json", //blue
+        "ipfs://QmZAkSusBbWvwTNm4j3Dn97C3yLA9GeS2B9bTmJvgx2R8p/3.json", //gold
+        "ipfs://QmZAkSusBbWvwTNm4j3Dn97C3yLA9GeS2B9bTmJvgx2R8p/4.json", //green
+        "ipfs://QmZAkSusBbWvwTNm4j3Dn97C3yLA9GeS2B9bTmJvgx2R8p/5.json",  //pink
+        "ipfs://QmZAkSusBbWvwTNm4j3Dn97C3yLA9GeS2B9bTmJvgx2R8p/6.json" //teal
     ];
 
+    struct Params{
+        uint max; // item tracker. 
+        uint price;
+        uint maxMint;   
+        uint totalSupply;
+        bool isWhiteListing;
+        bool whiteListed;
+    }
      
     function mintNFT(uint256 amt) public payable returns (uint256){
         uint balance = balanceOf(msg.sender); 
-        require(amt > 0 && amt <= maxMint, "too much minting");
-        require(balance + amt <= maxMint, "too much minting");
+        if(msg.sender != owner()){
+            require(amt > 0 && amt <= maxMint, "too much minting");
+            require(balance + amt <= maxMint, "too much minting");
+        }
         uint256 newid = _tokenIds.current(); 
         uint256 totalID = (newid + amt) - 1;
         require( totalID <= MAX, "max mint cap reached");
-        require( msg.value >= price * amt, "Under priced");
-        if(!stopWhiteList && msg.sender != owner() )
+
+        if( msg.sender != owner() ){
+            require( msg.value >= price * amt, "Under priced");
+        }
+
+        if( !stopWhiteList && msg.sender != owner() )
             require(whiteListed[msg.sender], "You've not been whitelisted");
 
         for(uint256 i = 1; i <= amt; i++){
@@ -151,6 +164,17 @@ contract CnoteMintPass is  ERC721URIStorage, Ownable {
                 whiteListed[_users[i]] = false;
             }
         }
+    }
+ 
+    function getData() public view returns(Params memory){
+        return Params({
+            max: MAX,
+            price: price,  
+            maxMint:maxMint, 
+            totalSupply:totalSupply,
+            isWhiteListing:!stopWhiteList,
+            whiteListed:whiteListed[msg.sender]
+        });
     }
 
 }
