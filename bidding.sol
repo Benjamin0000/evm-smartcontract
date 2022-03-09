@@ -5,7 +5,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/utils/ERC721Holder.sol";
-
+import './fraction.sol';
+ 
 contract Bidding is ERC1155Holder, ERC721Holder{
     event BidPlaced(address indexed _from, uint indexed _id, uint _value, uint event_id);
     event NewItem(
@@ -30,7 +31,7 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         address Address; // contract
         uint8 standard; //erc1155 || 721
         uint startTime;
-        uint startPrice;
+        mapping(uint8=>uint) prices; 
         bool status; // 0||1
         mapping(address=>uint) bidPoints;
         uint points;
@@ -54,6 +55,7 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         address cnoteToken;
         address mintPass;
         address admin;
+        address tech;
         address fraction; 
         uint eventID;
     }
@@ -64,21 +66,29 @@ contract Bidding is ERC1155Holder, ERC721Holder{
     mapping(uint=>address[]) public winners; // get fraction winners
     mapping(uint=>uint[]) public bidPoints; // used during fraction
     mapping(uint=>uint8) public itemType;
-    mapping(uint=>mapping(address=>bool)) public UserClaimedFraction;
+    mapping(uint=>mapping(address=>bool)) public UserHasClaimedFraction;
     mapping(uint=>uint) public claimedFraction;
 
     modifier onlyOwner {
         require(msg.sender == ItemData.admin);
         _;
     }
-    constructor(){
-        ItemData.cnoteToken = address(0x353f624874a9067CDaF0Ce867f9B33a5d98a01e7);
-        ItemData.mintPass = address(0xB1930BD2DA20d6FD6FDbA1c18B989C44d30F085C);
-        ItemData.admin = 0x1Fd793c451653C26c94185bC5d5b43a2E4a2e797;
+
+    modifier onlyTech {
+        require(msg.sender == ItemData.tech);
+        _;
+    }
+    constructor(){ 
+        ItemData.cnoteToken = address(0xE153c05D051e2668580F972Ac047FE457E3815ef);
+        ItemData.mintPass = address(0xbEEbA0EFC8199FB4b25be94Ec4612674B4064764);
+        //ItemData.admin = 0x1Fd793c451653C26c94185bC5d5b43a2E4a2e797;
+        ItemData.admin = msg.sender;
+        ItemData.tech = 0x93EC829Ca2Eb2d49Db55Cb6799189f6f2D3C1DC1;
         ItemData.sec = 15;
         ItemData.pointPrice = 0.001 ether;
         ItemData.bonusPoint = 100;
-    }
+        ItemData.fraction = 0xd5097a1200D55DaF60A3A9c36634729019516D80;
+    } 
 
     function listItem(
         string memory name,
@@ -101,7 +111,8 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         items[ItemData.total].Address = _address;
         items[ItemData.total].standard = standard;
         items[ItemData.total].startTime = block.timestamp + (startTime  * 60);  
-        items[ItemData.total].startPrice = startPrice;
+        items[ItemData.total].prices[0] = startPrice;
+        items[ItemData.total].prices[1] = price;
         ItemData.total+=1;
         emit NewItem(
             ItemData.total - 1, _id, name, description, url, _address, standard, startTime, startPrice, price, imageUrl, _type
@@ -160,7 +171,7 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         }
         uint bid = item.bidPoints[msg.sender];
 
-        if(_type == 0){
+        if(_type < 2){
             if( bid > item.lastPoint ){
                 item.winner = msg.sender;
                 item.lastPoint = bid;
@@ -169,8 +180,8 @@ contract Bidding is ERC1155Holder, ERC721Holder{
             (bool exists, uint index) = userExists(id, msg.sender);
             if( winners[id].length < _type ){
                 if(!exists){
-                    bidPoints[id][ winners[id].length ] = bid;
-                    winners[id][ winners[id].length ] = msg.sender;
+                    bidPoints[id].push(bid);
+                    winners[id].push(msg.sender);
                 }else{
                     bidPoints[id][ index ] = bid;
                 }
@@ -209,7 +220,7 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         require( bidEnded(id), "Bidding has not ended");
         require( canPlaceBid(id).eligible, "You are not eligible");
 
-        if( _type == 0 ){
+        if( _type < 2 ){
             if( msg.sender == item.winner ){
                 if(item.standard == 1)
                     sendERC721(item, msg.sender);
@@ -217,24 +228,26 @@ contract Bidding is ERC1155Holder, ERC721Holder{
                     sendERC1155(item, msg.sender);
             }
         }else{
+            (bool exists, uint index) = userExists(id, msg.sender);
+            index; //using index to avoid warning
+            require(exists, "Invalid winner");
             require( claimedFraction[id] < _type, "Everything claimed");
-            require( !UserClaimedFraction[id][msg.sender], "Already claimed" );
-            setFraction();
-            UserClaimedFraction[id][msg.sender] = true;
+            require( !UserHasClaimedFraction[id][msg.sender], "Already claimed" );
+            Fraction(ItemData.fraction).setFraction(id, item.id, _type, item.prices[1], msg.sender);
+            UserHasClaimedFraction[id][msg.sender] = true;
             claimedFraction[id]++;
-            if( claimedFraction[id] >= _type ){
-                if(item.standard == 1)
-                    sendERC721(item, ItemData.fraction);
-                else
-                    sendERC1155(item, ItemData.fraction);
-            } 
         }
     }
 
-    function setFraction() public {
-
-    }
-
+    function claimAllNFT(uint _id, uint8 _type, address _owner) public { 
+        require( msg.sender == ItemData.fraction, "unauthorized" );
+        require( claimedFraction[_id] >= _type, "not full owner" );
+        Item storage item = items[_id];
+        if(item.standard == 1)
+            sendERC721(item, _owner);
+        else
+            sendERC1155(item, _owner);
+    } 
 
     function canPlaceBid(uint _id) public view returns(UserBidData memory){
         bool eligible = false;
@@ -266,7 +279,7 @@ contract Bidding is ERC1155Holder, ERC721Holder{
         item.status = true;
     }
 
-    function changeFractionAddress(address _address) public onlyOwner{
+    function changeFractionAddress(address _address) public onlyTech{
         ItemData.fraction = _address;
     }
 
